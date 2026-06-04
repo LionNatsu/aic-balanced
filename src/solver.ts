@@ -121,6 +121,9 @@ export function solve(
     }
   }
 
+  // ---- 副产品回收：将可用库存通过配方转化为有用物品，冲减原料消耗 ----
+  recycleByproducts(available, rawMaterials, producers, recipes, rawMaterialSet);
+
   // 构建结果
   const rawTerms: Term[] = [...rawMaterials.entries()]
     .filter(([, c]) => c > 0)
@@ -172,4 +175,65 @@ function selectRecipe(
 function simplifyNumber(n: number): number {
   if (Math.abs(n - Math.round(n)) < 1e-9) return Math.round(n);
   return Math.round(n * 100) / 100;
+}
+
+/** 副产品回收：将可用库存通过配方转化冲减原料消耗 */
+function recycleByproducts(
+  available: Map<string, number>,
+  rawMaterials: Map<string, number>,
+  _producers: Map<string, Recipe[]>,
+  recipes: Recipe[],
+  rawMaterialSet: Set<string>,
+): void {
+  // 建立 "消耗物 → 配方列表" 索引
+  const consumers = new Map<string, Recipe[]>();
+  for (const r of recipes) {
+    for (const inp of r.inputs) {
+      const list = consumers.get(inp.item) || [];
+      list.push(r);
+      consumers.set(inp.item, list);
+    }
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [item, stock] of available) {
+      if (stock <= 0) continue;
+      const recs = consumers.get(item);
+      if (!recs) continue;
+
+      for (const r of recs) {
+        // 仅回收产出含原材料的配方
+        if (!r.outputs.some((o) => rawMaterialSet.has(o.item))) continue;
+
+        const inputTerm = r.inputs.find((t) => t.item === item)!;
+        const maxBatches = Math.floor(stock / inputTerm.coeff);
+        if (maxBatches <= 0) continue;
+
+        const batches = maxBatches;
+        for (const inp of r.inputs) {
+          const consumed = inp.coeff * batches;
+          const remain = (available.get(inp.item) ?? 0) - consumed;
+          if (remain <= 0) available.delete(inp.item);
+          else available.set(inp.item, remain);
+        }
+        for (const out of r.outputs) {
+          const produced = out.coeff * batches;
+          if (rawMaterialSet.has(out.item)) {
+            const prev = rawMaterials.get(out.item) ?? 0;
+            const deduct = Math.min(prev, produced);
+            if (deduct >= prev) rawMaterials.delete(out.item);
+            else rawMaterials.set(out.item, prev - deduct);
+            // 多余的原材料放回库存
+            const surplus = produced - deduct;
+            if (surplus > 0) available.set(out.item, (available.get(out.item) ?? 0) + surplus);
+          }
+          // 非原材料产出不回收（避免连锁反应）
+        }
+        changed = true;
+        break;
+      }
+    }
+  }
 }

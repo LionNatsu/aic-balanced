@@ -154,16 +154,13 @@ function selectRecipe(
   available: Map<string, number>,
 ): Recipe {
   if (candidates.length === 1) return candidates[0];
-
   let best = candidates[0];
   let bestScore = -1;
   for (const r of candidates) {
     let score = 0;
     for (const inp of r.inputs) {
-      if ((available.get(inp.item) ?? 0) > 0) score += inp.coeff;
+      score += Math.min(inp.coeff, (available.get(inp.item) ?? 0));
     }
-    // 输入项越少越好（简单优先）
-    score -= r.inputs.length * 0.01;
     if (score > bestScore) {
       bestScore = score;
       best = r;

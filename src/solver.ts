@@ -162,7 +162,7 @@ function selectRecipe(
   for (const r of candidates) {
     let score = 0;
     for (const inp of r.inputs) {
-      score += Math.min(inp.coeff, (available.get(inp.item) ?? 0));
+      if ((available.get(inp.item) ?? 0) > 0) score += 1;
     }
     if (score > bestScore) {
       bestScore = score;

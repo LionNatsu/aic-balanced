@@ -1,5 +1,16 @@
 import type { Recipe, Term, SolveResult, RecipeStep } from "./types";
 
+/** 从库存消费指定数量，返回剩余需求 */
+function consume(map: Map<string, number>, key: string, amount: number): number {
+  const stock = map.get(key) ?? 0;
+  if (stock <= 0) return amount;
+  const use = Math.min(amount, stock);
+  const remain = stock - use;
+  if (remain <= 0) map.delete(key);
+  else map.set(key, remain);
+  return amount - use;
+}
+
 /**
  * 购物清单法求解：
  * 已知原材料集合（不展开），从目标产物出发沿配方逆向推导。
@@ -57,15 +68,10 @@ export function solve(
     const needAmount = needed.get(item)!;
 
     // ---- 1. 使用库存 ----
-    const stock = available.get(item) ?? 0;
-    if (stock > 0) {
-      const use = Math.min(needAmount, stock);
-      const remainNeed = needAmount - use;
-      const remainStock = stock - use;
-      if (remainNeed <= 0) needed.delete(item);
-      else needed.set(item, remainNeed);
-      if (remainStock <= 0) available.delete(item);
-      else available.set(item, remainStock);
+    const remain = consume(available, item, needAmount);
+    if (remain < needAmount) {
+      if (remain <= 0) needed.delete(item);
+      else needed.set(item, remain);
       continue;
     }
 
@@ -106,15 +112,7 @@ export function solve(
     // 配方的投入 → 加入需求
     for (const inp of recipe.inputs) {
       const required = inp.coeff * batches;
-      const have = available.get(inp.item) ?? 0;
-      let toNeed = required;
-      if (have > 0) {
-        const useStock = Math.min(required, have);
-        toNeed = required - useStock;
-        const remainAvail = have - useStock;
-        if (remainAvail <= 0) available.delete(inp.item);
-        else available.set(inp.item, remainAvail);
-      }
+      const toNeed = consume(available, inp.item, required);
       if (toNeed > 0) {
         needed.set(inp.item, (needed.get(inp.item) ?? 0) + toNeed);
       }
@@ -122,18 +120,18 @@ export function solve(
   }
 
   // ---- 副产品回收 ----
-  recycleByproducts(available, rawMaterials, producers, recipes, rawMaterialSet, steps);
+  recycleByproducts(available, rawMaterials, recipes, rawMaterialSet, steps);
 
   // 构建结果
   const rawTerms: Term[] = [...rawMaterials.entries()]
     .filter(([, c]) => c > 0)
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([item, coeff]) => ({ item, coeff: simplifyNumber(coeff) }));
+    .map(([item, coeff]) => ({ item, coeff }));
 
   const byproductTerms: Term[] = [...available.entries()]
     .filter(([, c]) => c > 0)
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([item, coeff]) => ({ item, coeff: simplifyNumber(coeff) }));
+    .map(([item, coeff]) => ({ item, coeff }));
 
   const stepList: RecipeStep[] = [...steps.entries()]
     .filter(([, c]) => c > 0)
@@ -172,16 +170,9 @@ function selectRecipe(
   return best;
 }
 
-function simplifyNumber(n: number): number {
-  if (Math.abs(n - Math.round(n)) < 1e-9) return Math.round(n);
-  return Math.round(n * 100) / 100;
-}
-
-/** 副产品回收：将可用库存通过配方转化冲减原料消耗 */
 function recycleByproducts(
   available: Map<string, number>,
   rawMaterials: Map<string, number>,
-  _producers: Map<string, Recipe[]>,
   recipes: Recipe[],
   rawMaterialSet: Set<string>,
   steps: Map<string, number>,
@@ -197,7 +188,9 @@ function recycleByproducts(
   }
 
   let changed = true;
+  let ri = 0;
   while (changed) {
+    if (++ri > 1000) break;
     changed = false;
     for (const [item, stock] of available) {
       if (stock <= 0) continue;
@@ -226,10 +219,7 @@ function recycleByproducts(
 
         // 执行配方
         for (const inp of r.inputs) {
-          const consumed = inp.coeff * batches;
-          const remain = (available.get(inp.item) ?? 0) - consumed;
-          if (remain <= 0) available.delete(inp.item);
-          else available.set(inp.item, remain);
+          consume(available, inp.item, inp.coeff * batches);
         }
         for (const out of r.outputs) {
           const produced = out.coeff * batches;

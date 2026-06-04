@@ -121,8 +121,8 @@ export function solve(
     }
   }
 
-  // ---- 副产品回收：将可用库存通过配方转化为有用物品，冲减原料消耗 ----
-  recycleByproducts(available, rawMaterials, producers, recipes, rawMaterialSet);
+  // ---- 副产品回收 ----
+  recycleByproducts(available, rawMaterials, producers, recipes, rawMaterialSet, steps);
 
   // 构建结果
   const rawTerms: Term[] = [...rawMaterials.entries()]
@@ -184,6 +184,7 @@ function recycleByproducts(
   _producers: Map<string, Recipe[]>,
   recipes: Recipe[],
   rawMaterialSet: Set<string>,
+  steps: Map<string, number>,
 ): void {
   // 建立 "消耗物 → 配方列表" 索引
   const consumers = new Map<string, Recipe[]>();
@@ -223,6 +224,7 @@ function recycleByproducts(
         }
         if (batches <= 0) continue;
 
+        // 执行配方
         for (const inp of r.inputs) {
           const consumed = inp.coeff * batches;
           const remain = (available.get(inp.item) ?? 0) - consumed;
@@ -242,6 +244,7 @@ function recycleByproducts(
             available.set(out.item, (available.get(out.item) ?? 0) + produced);
           }
         }
+        steps.set(r.raw, (steps.get(r.raw) ?? 0) + batches);
         changed = true;
         break;
       }

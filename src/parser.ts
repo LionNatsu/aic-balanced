@@ -1,4 +1,4 @@
-import type { Recipe, RecipeFile, Term } from "./types";
+import type { Recipe, RecipeFile, Term } from './types';
 
 /**
  * 解析配方文件。
@@ -21,8 +21,10 @@ export function parseRecipeFile(text: string): RecipeFile {
     if (!raw) continue;
 
     // 注释行 / 指令行
-    if (raw.startsWith("#") || raw.startsWith("//") || raw.startsWith("@")) {
-      const m = raw.match(/^(?:[#\/]+\s*)?@raw\s+([\w\u4e00-\u9fff]+(?:\s*[,，]\s*[\w\u4e00-\u9fff]+)*)\s*$/i);
+    if (raw.startsWith('#') || raw.startsWith('//') || raw.startsWith('@')) {
+      const m = raw.match(
+        /^(?:[#/]+\s*)?@raw\s+([\w\u4e00-\u9fff]+(?:\s*[,，]\s*[\w\u4e00-\u9fff]+)*)\s*$/i,
+      );
       if (m) {
         for (const name of m[1].split(/[,，]+/)) {
           const t = name.trim();
@@ -32,7 +34,7 @@ export function parseRecipeFile(text: string): RecipeFile {
       continue;
     }
 
-    const eqIdx = raw.indexOf("=");
+    const eqIdx = raw.indexOf('=');
     if (eqIdx === -1) {
       throw new Error(`第 ${i + 1} 行缺少等号 "=": ${raw}`);
     }
@@ -68,7 +70,7 @@ export function parseRecipeFile(text: string): RecipeFile {
 
 /** 解析等号一侧，按 "+" 分割 */
 function parseSide(side: string): Term[] {
-  return side.split("+").map((s) => {
+  return side.split('+').map((s) => {
     const trimmed = s.trim();
     const match = trimmed.match(/^(\d*)\s*(.+)$/);
     if (!match) throw new Error(`无法解析项: "${trimmed}"`);

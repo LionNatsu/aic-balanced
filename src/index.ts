@@ -1,22 +1,22 @@
-import { parseRecipeFile } from "./parser";
-import { solve } from "./solver";
-import type { Term } from "./types";
+import { parseRecipeFile } from './parser';
+import { solve } from './solver';
+import type { RecipeFile, SolveResult, Term } from './types';
 
 async function main() {
   const args = process.argv.slice(2);
 
   if (args.length < 2) {
-    console.error("usage: aic-balance <recipe-file> <target> [amount]");
-    console.error("  e.g. aic-balance recipes.txt 赫铜块");
-    console.error("       aic-balance recipes.txt 赫铜块 3");
+    console.error('usage: aic-balance <recipe-file> <target> [amount]');
+    console.error('  e.g. aic-balance recipes.txt 赫铜块');
+    console.error('       aic-balance recipes.txt 赫铜块 3');
     process.exit(1);
   }
 
   const [filePath, target, amountStr] = args;
   const amount = amountStr ? parseFloat(amountStr) : 1;
 
-  if (isNaN(amount) || amount <= 0) {
-    console.error("error: amount must be positive");
+  if (Number.isNaN(amount) || amount <= 0) {
+    console.error('error: amount must be positive');
     process.exit(1);
   }
 
@@ -29,11 +29,11 @@ async function main() {
     process.exit(1);
   }
 
-  let recipeFile;
+  let recipeFile: RecipeFile;
   try {
     recipeFile = parseRecipeFile(text);
   } catch (e) {
-    console.error("error: parse failed");
+    console.error('error: parse failed');
     console.error((e as Error).message);
     process.exit(1);
   }
@@ -41,17 +41,17 @@ async function main() {
   const { recipes, rawMaterials } = recipeFile;
 
   if (recipes.length === 0) {
-    console.error("error: no recipes found");
+    console.error('error: no recipes found');
     process.exit(1);
   }
 
   const rawSet = new Set(rawMaterials);
 
-  let result;
+  let result: SolveResult;
   try {
     result = solve(target, amount, recipes, rawSet);
   } catch (e) {
-    console.error("error:", (e as Error).message);
+    console.error('error:', (e as Error).message);
     process.exit(1);
   }
 
@@ -59,26 +59,23 @@ async function main() {
   const stepLines = result.steps.map((s) => {
     const prefix = `${s.count}x `;
     const [left, right] = s.raw.split(/\s*=\s*/, 2);
-    return { prefix, left: left ?? "", right: right ?? "" };
+    return { prefix, left: left ?? '', right: right ?? '' };
   });
-  const maxLeft = stepLines.reduce(
-    (m, sl) => Math.max(m, displayWidth(sl.prefix + sl.left)),
-    0,
-  );
-  console.error("steps:");
+  const maxLeft = stepLines.reduce((m, sl) => Math.max(m, displayWidth(sl.prefix + sl.left)), 0);
+  console.error('steps:');
   for (const sl of stepLines) {
     const pad = maxLeft - displayWidth(sl.prefix + sl.left);
-    const padStr = " ".repeat(pad);
+    const padStr = ' '.repeat(pad);
     console.error(`  ${sl.prefix}${sl.left}${padStr} = ${sl.right}`);
   }
 
   // stdout: 配平方程（可被管道消费）
-  const inputs = result.rawMaterials.map(formatTerm).join(" + ");
+  const inputs = result.rawMaterials.map(formatTerm).join(' + ');
   const outputs = [formatTerm(result.target)];
   if (result.byproducts.length > 0) {
-    outputs.push(result.byproducts.map(formatTerm).join(" + "));
+    outputs.push(result.byproducts.map(formatTerm).join(' + '));
   }
-  console.log(`${inputs || "0"} = ${outputs.join(" + ")}`);
+  console.log(`${inputs || '0'} = ${outputs.join(' + ')}`);
 }
 
 function formatTerm(t: Term): string {
@@ -91,7 +88,7 @@ function formatTerm(t: Term): string {
 function displayWidth(s: string): number {
   let w = 0;
   for (const ch of s) {
-    const cp = ch.codePointAt(0)!;
+    const cp = ch.codePointAt(0) ?? 0;
     w +=
       (cp >= 0x1100 && cp <= 0x115f) || // Hangul Jamo
       (cp >= 0x2e80 && cp <= 0xa4cf) || // CJK Radicals .. Yi
@@ -101,7 +98,7 @@ function displayWidth(s: string): number {
       (cp >= 0xfe30 && cp <= 0xfe6f) || // CJK Compatibility Forms
       (cp >= 0xff00 && cp <= 0xff60) || // Fullwidth Forms
       (cp >= 0xffe0 && cp <= 0xffe6) || // Fullwidth Signs
-      (cp >= 0x20000 && cp <= 0x2ffff)  // CJK Extension B+
+      (cp >= 0x20000 && cp <= 0x2ffff) // CJK Extension B+
         ? 2
         : 1;
   }

@@ -1,4 +1,4 @@
-import type { Recipe, Term, SolveResult, RecipeStep } from "./types";
+import type { Recipe, RecipeStep, SolveResult, Term } from './types';
 
 /** 从库存消费指定数量，返回剩余需求 */
 function consume(map: Map<string, number>, key: string, amount: number): number {
@@ -48,9 +48,7 @@ export function solve(
 
   while (needed.size > 0) {
     if (++iterations > MAX_ITERATIONS) {
-      const remaining = [...needed.entries()]
-        .map(([k, v]) => `${v}${k}`)
-        .join(", ");
+      const remaining = [...needed.entries()].map(([k, v]) => `${v}${k}`).join(', ');
       throw new Error(
         `求解超过 ${MAX_ITERATIONS} 轮，请检查配方是否存在循环依赖。剩余: ${remaining}`,
       );
@@ -64,8 +62,16 @@ export function solve(
         break;
       }
     }
-    if (!item) item = needed.keys().next().value!;
-    const needAmount = needed.get(item)!;
+    if (!item) {
+      const next = needed.keys().next();
+      if (next.done) break;
+      item = next.value;
+    }
+    const needAmount = needed.get(item) ?? 0;
+    if (needAmount <= 0) {
+      needed.delete(item);
+      continue;
+    }
 
     // ---- 1. 使用库存 ----
     const remain = consume(available, item, needAmount);
@@ -76,16 +82,30 @@ export function solve(
     }
 
     // ---- 2. 原材料 → 记录消耗，不展开 ----
-    if (rawMaterialSet.has(item) || !producers.has(item) || producers.get(item)!.length === 0) {
+    if (
+      rawMaterialSet.has(item) ||
+      !producers.has(item) ||
+      (producers.get(item)?.length ?? 0) === 0
+    ) {
       rawMaterials.set(item, (rawMaterials.get(item) ?? 0) + needAmount);
       needed.delete(item);
       continue;
     }
 
     // ---- 3. 选配方展开 ----
-    const candidates = producers.get(item)!;
+    const candidates = producers.get(item);
+    if (!candidates || candidates.length === 0) {
+      rawMaterials.set(item, (rawMaterials.get(item) ?? 0) + needAmount);
+      needed.delete(item);
+      continue;
+    }
     const recipe = selectRecipe(candidates, available);
-    const outputTerm = recipe.outputs.find((o) => o.item === item)!;
+    const outputTerm = recipe.outputs.find((o) => o.item === item);
+    if (!outputTerm) {
+      rawMaterials.set(item, (rawMaterials.get(item) ?? 0) + needAmount);
+      needed.delete(item);
+      continue;
+    }
     const batches = Math.ceil(needAmount / outputTerm.coeff);
 
     // 记录步骤
@@ -102,10 +122,7 @@ export function solve(
     // 配方的其他产出 → 库存
     for (const out of recipe.outputs) {
       if (out.item !== item) {
-        available.set(
-          out.item,
-          (available.get(out.item) ?? 0) + out.coeff * batches,
-        );
+        available.set(out.item, (available.get(out.item) ?? 0) + out.coeff * batches);
       }
     }
 
@@ -150,10 +167,7 @@ export function solve(
  * 从候选配方中选最优的。
  * 策略：优先选择输入项中已经有库存的配方。
  */
-function selectRecipe(
-  candidates: Recipe[],
-  available: Map<string, number>,
-): Recipe {
+function selectRecipe(candidates: Recipe[], available: Map<string, number>): Recipe {
   if (candidates.length === 1) return candidates[0];
   let best = candidates[0];
   let bestScore = -1;
@@ -199,12 +213,11 @@ function recycleByproducts(
 
       for (const r of recs) {
         // 回收任何产出有用的配方（产出原材料、或可被进一步消费）
-        const useful = r.outputs.some(
-          (o) => rawMaterialSet.has(o.item) || consumers.has(o.item),
-        );
+        const useful = r.outputs.some((o) => rawMaterialSet.has(o.item) || consumers.has(o.item));
         if (!useful) continue;
 
-        const inputTerm = r.inputs.find((t) => t.item === item)!;
+        const inputTerm = r.inputs.find((t) => t.item === item);
+        if (!inputTerm) continue;
         const maxBatches = Math.floor(stock / inputTerm.coeff);
         if (maxBatches <= 0) continue;
 

@@ -99,7 +99,7 @@ export function solve(
       needed.delete(item);
       continue;
     }
-    const recipe = selectRecipe(candidates, available);
+    const recipe = selectRecipe(candidates, available, rawMaterialSet);
     const outputTerm = recipe.outputs.find((o) => o.item === item);
     if (!outputTerm) {
       rawMaterials.set(item, (rawMaterials.get(item) ?? 0) + needAmount);
@@ -167,17 +167,33 @@ export function solve(
  * 从候选配方中选最优的。
  * 策略：优先选择输入项中已经有库存的配方。
  */
-function selectRecipe(candidates: Recipe[], available: Map<string, number>): Recipe {
-  if (candidates.length === 1) return candidates[0];
+function selectRecipe(
+  candidates: Recipe[],
+  available: Map<string, number>,
+  rawMaterialSet: Set<string>,
+): Recipe {
+  // 评分：库存命中 > 总输入系数小 > 含原材料多 > 文件顺序兜底
   let best = candidates[0];
-  let bestScore = -1;
+  let bestStock = -1;
+  let bestCost = Infinity;
+  let bestRaw = -1;
   for (const r of candidates) {
-    let score = 0;
+    let stock = 0;
+    let cost = 0;
+    let raw = 0;
     for (const inp of r.inputs) {
-      if ((available.get(inp.item) ?? 0) > 0) score += 1;
+      if ((available.get(inp.item) ?? 0) > 0) stock++;
+      cost += inp.coeff;
+      if (rawMaterialSet.has(inp.item)) raw++;
     }
-    if (score > bestScore) {
-      bestScore = score;
+    if (
+      stock > bestStock ||
+      (stock === bestStock && cost < bestCost) ||
+      (stock === bestStock && cost === bestCost && raw > bestRaw)
+    ) {
+      bestStock = stock;
+      bestCost = cost;
+      bestRaw = raw;
       best = r;
     }
   }

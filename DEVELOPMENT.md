@@ -102,15 +102,19 @@ src/
 ## 运行
 
 ```bash
-# 安装依赖
-bun install
-
-# 运行
+bun install          # 安装依赖
+bun start            # 运行（需传参，见 README）
 bun run src/index.ts recipes.txt 赫铜块
-
-# 类型检查
-bun run --no-bundler tsc --noEmit
 ```
+
+## 代码质量
+
+```bash
+bun check            # Biome: lint + format + organize imports
+bun typecheck        # tsc --noEmit 类型检查
+```
+
+配置：`biome.jsonc`（2 空格缩进、单引号、行宽 100）
 
 ## 待办
 

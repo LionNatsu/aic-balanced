@@ -58,10 +58,21 @@ async function main() {
     process.exit(1);
   }
 
-  // stderr: 配方调用明细
+  // stderr: 配方调用明细（= 对齐）
+  const stepLines = result.steps.map((s) => {
+    const prefix = `${s.count}x `;
+    const [left, right] = s.raw.split(/\s*=\s*/, 2);
+    return { prefix, left: left ?? "", right: right ?? "" };
+  });
+  const maxLeft = stepLines.reduce(
+    (m, sl) => Math.max(m, displayWidth(sl.prefix + sl.left)),
+    0,
+  );
   console.error("steps:");
-  for (const s of result.steps) {
-    console.error(`  ${s.count}x ${s.raw}`);
+  for (const sl of stepLines) {
+    const pad = maxLeft - displayWidth(sl.prefix + sl.left);
+    const padStr = " ".repeat(pad);
+    console.error(`  ${sl.prefix}${sl.left}${padStr} = ${sl.right}`);
   }
 
   // stdout: 配平方程（可被管道消费）
@@ -77,6 +88,27 @@ function formatTerm(t: Term): string {
   if (t.coeff === 1) return t.item;
   if (Number.isInteger(t.coeff)) return `${t.coeff}${t.item}`;
   return `${t.coeff}${t.item}`;
+}
+
+/** 显示宽度：ASCII=1，CJK/全角=2 */
+function displayWidth(s: string): number {
+  let w = 0;
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!;
+    w +=
+      (cp >= 0x1100 && cp <= 0x115f) || // Hangul Jamo
+      (cp >= 0x2e80 && cp <= 0xa4cf) || // CJK Radicals .. Yi
+      (cp >= 0xac00 && cp <= 0xd7a3) || // Hangul Syllables
+      (cp >= 0xf900 && cp <= 0xfaff) || // CJK Compatibility
+      (cp >= 0xfe10 && cp <= 0xfe19) || // Vertical forms
+      (cp >= 0xfe30 && cp <= 0xfe6f) || // CJK Compatibility Forms
+      (cp >= 0xff00 && cp <= 0xff60) || // Fullwidth Forms
+      (cp >= 0xffe0 && cp <= 0xffe6) || // Fullwidth Signs
+      (cp >= 0x20000 && cp <= 0x2ffff)  // CJK Extension B+
+        ? 2
+        : 1;
+  }
+  return w;
 }
 
 main();

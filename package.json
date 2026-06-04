@@ -1,6 +1,7 @@
 {
   "name": "aic-balanced",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "AIC 生产配平工具 - 根据配方反向推导目标产物所需原料",
   "type": "module",
   "bin": {

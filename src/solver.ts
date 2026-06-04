@@ -15,8 +15,8 @@ export function solve(
   const needed = new Map<string, number>();
   // 副产品库存
   const available = new Map<string, number>();
-  // 配方调用记录
-  const steps = new Map<string, RecipeStep>();
+  // 配方调用记录 (raw → count)
+  const steps = new Map<string, number>();
   // 最终原料消耗
   const rawMaterials = new Map<string, number>();
 
@@ -78,18 +78,12 @@ export function solve(
 
     // ---- 3. 选配方展开 ----
     const candidates = producers.get(item)!;
-    const recipe = selectRecipe(item, candidates, available);
+    const recipe = selectRecipe(candidates, available);
     const outputTerm = recipe.outputs.find((o) => o.item === item)!;
     const batches = Math.ceil(needAmount / outputTerm.coeff);
 
     // 记录步骤
-    const stepKey = recipe.raw;
-    const existing = steps.get(stepKey);
-    if (existing) {
-      existing.count += batches;
-    } else {
-      steps.set(stepKey, { recipe, count: batches });
-    }
+    steps.set(recipe.raw, (steps.get(recipe.raw) ?? 0) + batches);
 
     // 该物品需求已满足
     const produced = outputTerm.coeff * batches;
@@ -138,9 +132,10 @@ export function solve(
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([item, coeff]) => ({ item, coeff: simplifyNumber(coeff) }));
 
-  const stepList: RecipeStep[] = [...steps.values()]
-    .filter((s) => s.count > 0 && s.recipe.line > 0) // 只显示原始配方
-    .sort((a, b) => b.count - a.count);
+  const stepList: RecipeStep[] = [...steps.entries()]
+    .filter(([, c]) => c > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([raw, count]) => ({ raw, count }));
 
   return {
     steps: stepList,
@@ -155,7 +150,6 @@ export function solve(
  * 策略：优先选择输入项中已经有库存的配方。
  */
 function selectRecipe(
-  _target: string,
   candidates: Recipe[],
   available: Map<string, number>,
 ): Recipe {

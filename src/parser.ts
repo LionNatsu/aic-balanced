@@ -14,7 +14,7 @@ import type { Recipe, RecipeFile, Term } from "./types";
 export function parseRecipeFile(text: string): RecipeFile {
   const lines = text.split(/\r?\n/);
   const recipes: Recipe[] = [];
-  const explicitRaw: string[] = [];
+  const explicitRaw = new Set<string>();
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i].trim();
@@ -24,9 +24,9 @@ export function parseRecipeFile(text: string): RecipeFile {
     if (raw.startsWith("#") || raw.startsWith("//") || raw.startsWith("@")) {
       const m = raw.match(/^(?:[#\/]+\s*)?@raw\s+([\w\u4e00-\u9fff]+(?:\s*[,，]\s*[\w\u4e00-\u9fff]+)*)\s*$/i);
       if (m) {
-        for (const name of m[1].split(/[,，\s]+/)) {
-          const trimmed = name.trim();
-          if (trimmed) explicitRaw.push(trimmed);
+        for (const name of m[1].split(/[,，]+/)) {
+          const t = name.trim();
+          if (t) explicitRaw.add(t);
         }
       }
       continue;
@@ -52,28 +52,18 @@ export function parseRecipeFile(text: string): RecipeFile {
     });
   }
 
-  // 自动检测原材料：未在任何配方输出中出现过的物品
+  // 自动原材料：未被任何配方产出的物品
   const produced = new Set<string>();
   for (const r of recipes) {
     for (const o of r.outputs) produced.add(o.item);
   }
-  const autoRaw: string[] = [];
-  const allItems = new Set<string>();
   for (const r of recipes) {
-    for (const t of r.inputs) allItems.add(t.item);
-    for (const t of r.outputs) allItems.add(t.item);
-  }
-  for (const item of allItems) {
-    if (!produced.has(item)) autoRaw.push(item);
+    for (const t of r.inputs) {
+      if (!produced.has(t.item)) explicitRaw.add(t.item);
+    }
   }
 
-  // 合并显式 + 自动原材料（去重）
-  const rawSet = new Set([...explicitRaw, ...autoRaw]);
-
-  return {
-    recipes,
-    rawMaterials: [...rawSet],
-  };
+  return { recipes, rawMaterials: [...explicitRaw] };
 }
 
 /** 解析等号一侧，按 "+" 分割 */

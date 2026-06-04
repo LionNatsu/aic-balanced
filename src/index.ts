@@ -2,7 +2,7 @@ import { parseRecipeFile } from "./parser";
 import { solve } from "./solver";
 import type { Term } from "./types";
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
 
   if (args.length < 2) {
@@ -22,7 +22,7 @@ function main() {
 
   let text: string;
   try {
-    text = require("fs").readFileSync(filePath, "utf-8") as string;
+    text = await Bun.file(filePath).text();
   } catch (e) {
     console.error(`error: cannot read "${filePath}"`);
     console.error((e as Error).message);
@@ -61,7 +61,7 @@ function main() {
   // stderr: 配方调用明细
   console.error("steps:");
   for (const s of result.steps) {
-    console.error(`  ${s.count}x ${s.recipe.raw}`);
+    console.error(`  ${s.count}x ${s.raw}`);
   }
 
   // stdout: 配平方程（可被管道消费）

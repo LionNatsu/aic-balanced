@@ -47,9 +47,6 @@ async function main() {
 
   const rawSet = new Set(rawMaterials);
 
-  console.error(`recipes: ${recipes.length}`);
-  console.error(`raw: ${rawMaterials.join(", ")}`);
-
   let result;
   try {
     result = solve(target, amount, recipes, rawSet);

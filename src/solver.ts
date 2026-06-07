@@ -99,7 +99,7 @@ export function solve(
       needed.delete(item);
       continue;
     }
-    const recipe = selectRecipe(candidates, available, rawMaterialSet);
+    const recipe = selectRecipe(candidates, available, rawMaterialSet, item);
     const outputTerm = recipe.outputs.find((o) => o.item === item);
     if (!outputTerm) {
       rawMaterials.set(item, (rawMaterials.get(item) ?? 0) + needAmount);
@@ -171,10 +171,12 @@ function selectRecipe(
   candidates: Recipe[],
   available: Map<string, number>,
   rawMaterialSet: Set<string>,
+  targetItem: string,
 ): Recipe {
-  // 评分：库存命中 > 总输入系数小 > 含原材料多 > 文件顺序兜底
+  // 评分：库存命中 > 产出系数大 > 总输入系数小 > 含原材料多 > 文件顺序
   let best = candidates[0];
   let bestStock = -1;
+  let bestYield = -1;
   let bestCost = Infinity;
   let bestRaw = -1;
   for (const r of candidates) {
@@ -186,12 +188,15 @@ function selectRecipe(
       cost += inp.coeff;
       if (rawMaterialSet.has(inp.item)) raw++;
     }
+    const yld = r.outputs.find((o) => o.item === targetItem)?.coeff ?? 1;
     if (
       stock > bestStock ||
-      (stock === bestStock && cost < bestCost) ||
-      (stock === bestStock && cost === bestCost && raw > bestRaw)
+      (stock === bestStock && yld > bestYield) ||
+      (stock === bestStock && yld === bestYield && cost < bestCost) ||
+      (stock === bestStock && yld === bestYield && cost === bestCost && raw > bestRaw)
     ) {
       bestStock = stock;
+      bestYield = yld;
       bestCost = cost;
       bestRaw = raw;
       best = r;

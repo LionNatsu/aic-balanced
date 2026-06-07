@@ -147,6 +147,24 @@ export function solve(
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([item, coeff]) => ({ item, coeff }));
 
+  // 净额抵消：副产品含原材料时，冲减原料消耗
+  for (const bp of byproductTerms) {
+    const ri = rawTerms.findIndex((r) => r.item === bp.item);
+    if (ri === -1) continue;
+    const deduct = Math.min(rawTerms[ri].coeff, bp.coeff);
+    rawTerms[ri].coeff -= deduct;
+    bp.coeff -= deduct;
+  }
+
+  // 净额抵消：副产品含原材料时，冲减原料消耗
+  for (const bp of byproductTerms) {
+    const ri = rawTerms.findIndex((r) => r.item === bp.item);
+    if (ri === -1) continue;
+    const deduct = Math.min(rawTerms[ri].coeff, bp.coeff);
+    rawTerms[ri].coeff -= deduct;
+    bp.coeff -= deduct;
+  }
+
   const stepList: RecipeStep[] = [...steps.entries()]
     .filter(([, c]) => c > 0)
     .sort((a, b) => b[1] - a[1])
@@ -154,8 +172,8 @@ export function solve(
 
   return {
     steps: stepList,
-    rawMaterials: rawTerms,
-    byproducts: byproductTerms,
+    rawMaterials: rawTerms.filter((t) => t.coeff > 0),
+    byproducts: byproductTerms.filter((t) => t.coeff > 0),
     target: targets,
   };
 }

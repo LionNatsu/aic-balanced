@@ -20,7 +20,7 @@ export interface SolveResult {
   steps: RecipeStep[];
   rawMaterials: Term[];
   byproducts: Term[];
-  target: Term;
+  target: Term[];
 }
 
 export interface RecipeStep {

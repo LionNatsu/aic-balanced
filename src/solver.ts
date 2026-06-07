@@ -17,13 +17,15 @@ function consume(map: Map<string, number>, key: string, amount: number): number 
  * 副产品库存自动抵扣后续需求。O(n) 复杂度，适合 DAG 配方图。
  */
 export function solve(
-  target: string,
-  targetAmount: number,
+  targets: Term[],
   recipes: Recipe[],
   rawMaterialSet: Set<string>,
 ): SolveResult {
   // 需要获取的物品 → 数量
   const needed = new Map<string, number>();
+  for (const t of targets) {
+    needed.set(t.item, (needed.get(t.item) ?? 0) + t.coeff);
+  }
   // 副产品库存
   const available = new Map<string, number>();
   // 配方调用记录 (raw → count)
@@ -40,8 +42,6 @@ export function solve(
       producers.set(out.item, list);
     }
   }
-
-  needed.set(target, targetAmount);
 
   let iterations = 0;
   const MAX_ITERATIONS = 20000;
@@ -156,7 +156,7 @@ export function solve(
     steps: stepList,
     rawMaterials: rawTerms,
     byproducts: byproductTerms,
-    target: { item: target, coeff: targetAmount },
+    target: targets,
   };
 }
 

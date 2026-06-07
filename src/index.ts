@@ -6,18 +6,27 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length < 2) {
-    console.error('usage: aic-balance <recipe-file> <target> [amount]');
+    console.error('usage: aic-balance <recipe-file> <target>...');
     console.error('  e.g. aic-balance recipes.txt 赫铜块');
-    console.error('       aic-balance recipes.txt 赫铜块 3');
+    console.error('       aic-balance recipes.txt 3赫铜块 2蓝铁瓶');
     process.exit(1);
   }
 
-  const [filePath, target, amountStr] = args;
-  const amount = amountStr ? parseFloat(amountStr) : 1;
-
-  if (Number.isNaN(amount) || amount <= 0) {
-    console.error('error: amount must be positive');
-    process.exit(1);
+  const [filePath, ...targetArgs] = args;
+  const targets: Term[] = [];
+  for (const arg of targetArgs) {
+    const m = arg.match(/^(\d*)(.+)$/);
+    if (!m) {
+      console.error(`error: invalid target "${arg}"`);
+      process.exit(1);
+    }
+    const coeff = m[1] ? parseFloat(m[1]) : 1;
+    const item = m[2];
+    if (Number.isNaN(coeff) || coeff <= 0 || !item) {
+      console.error(`error: invalid target "${arg}"`);
+      process.exit(1);
+    }
+    targets.push({ coeff, item });
   }
 
   let text: string;
@@ -49,7 +58,7 @@ async function main() {
 
   let result: SolveResult;
   try {
-    result = solve(target, amount, recipes, rawSet);
+    result = solve(targets, recipes, rawSet);
   } catch (e) {
     console.error('error:', (e as Error).message);
     process.exit(1);
@@ -71,7 +80,7 @@ async function main() {
 
   // stdout: 配平方程（可被管道消费）
   const inputs = result.rawMaterials.map(formatTerm).join(' + ');
-  const outputs = [formatTerm(result.target)];
+  const outputs = result.target.map(formatTerm);
   if (result.byproducts.length > 0) {
     outputs.push(result.byproducts.map(formatTerm).join(' + '));
   }

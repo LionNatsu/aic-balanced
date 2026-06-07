@@ -11,17 +11,22 @@ bun install
 ## 用法
 
 ```bash
-bun run src/index.ts <配方文件> <目标产物> [数量]
+bun run src/index.ts <配方文件> <目标>...
 ```
+
+目标格式：`[数量]物品名`，数量省略为 1。
 
 ### 示例
 
 ```bash
-# 计算生产 1 个赫铜块需要多少原料
+# 单个目标
 bun run src/index.ts recipes.txt 赫铜块
 
-# 计算生产 3 个赫铜块需要多少原料
-bun run src/index.ts recipes.txt 赫铜块 3
+# 带数量
+bun run src/index.ts recipes.txt 3赫铜块
+
+# 多目标联产
+bun run src/index.ts recipes.txt 3赫铜块 2蓝铁瓶
 ```
 
 输出（stderr=步骤明细，stdout=配平方程）：

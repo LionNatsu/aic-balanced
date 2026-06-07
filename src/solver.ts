@@ -233,8 +233,9 @@ function recycleByproducts(
       if (!recs) continue;
 
       for (const r of recs) {
-        // 仅回收产出含原材料的配方
-        if (!r.outputs.some((o) => rawMaterialSet.has(o.item))) continue;
+        // 回收任何产出有用的配方（产出原材料、或可被进一步消费）
+        const useful = r.outputs.some((o) => rawMaterialSet.has(o.item) || consumers.has(o.item));
+        if (!useful) continue;
 
         const inputTerm = r.inputs.find((t) => t.item === item);
         if (!inputTerm) continue;
@@ -255,14 +256,17 @@ function recycleByproducts(
           consume(available, inp.item, inp.coeff * batches);
         }
         for (const out of r.outputs) {
-          if (!rawMaterialSet.has(out.item)) continue;
           const produced = out.coeff * batches;
-          const prev = rawMaterials.get(out.item) ?? 0;
-          const deduct = Math.min(prev, produced);
-          if (deduct >= prev) rawMaterials.delete(out.item);
-          else rawMaterials.set(out.item, prev - deduct);
-          const surplus = produced - deduct;
-          if (surplus > 0) available.set(out.item, (available.get(out.item) ?? 0) + surplus);
+          if (rawMaterialSet.has(out.item)) {
+            const prev = rawMaterials.get(out.item) ?? 0;
+            const deduct = Math.min(prev, produced);
+            if (deduct >= prev) rawMaterials.delete(out.item);
+            else rawMaterials.set(out.item, prev - deduct);
+            const surplus = produced - deduct;
+            if (surplus > 0) available.set(out.item, (available.get(out.item) ?? 0) + surplus);
+          } else {
+            available.set(out.item, (available.get(out.item) ?? 0) + produced);
+          }
         }
         steps.set(r.raw, (steps.get(r.raw) ?? 0) + batches);
         changed = true;

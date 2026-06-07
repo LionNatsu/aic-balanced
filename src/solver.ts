@@ -136,9 +136,6 @@ export function solve(
     }
   }
 
-  // ---- 副产品回收 ----
-  recycleByproducts(available, rawMaterials, recipes, rawMaterialSet, steps);
-
   // 构建结果
   const rawTerms: Term[] = [...rawMaterials.entries()]
     .filter(([, c]) => c > 0)
@@ -205,73 +202,3 @@ function selectRecipe(
   return best;
 }
 
-function recycleByproducts(
-  available: Map<string, number>,
-  rawMaterials: Map<string, number>,
-  recipes: Recipe[],
-  rawMaterialSet: Set<string>,
-  steps: Map<string, number>,
-): void {
-  // 建立 "消耗物 → 配方列表" 索引
-  const consumers = new Map<string, Recipe[]>();
-  for (const r of recipes) {
-    for (const inp of r.inputs) {
-      const list = consumers.get(inp.item) || [];
-      list.push(r);
-      consumers.set(inp.item, list);
-    }
-  }
-
-  let changed = true;
-  let ri = 0;
-  while (changed) {
-    if (++ri > 1000) break;
-    changed = false;
-    for (const [item, stock] of available) {
-      if (stock <= 0) continue;
-      const recs = consumers.get(item);
-      if (!recs) continue;
-
-      for (const r of recs) {
-        // 回收任何产出有用的配方（产出原材料、或可被进一步消费）
-        const useful = r.outputs.some((o) => rawMaterialSet.has(o.item) || consumers.has(o.item));
-        if (!useful) continue;
-
-        const inputTerm = r.inputs.find((t) => t.item === item);
-        if (!inputTerm) continue;
-        const maxBatches = Math.floor(stock / inputTerm.coeff);
-        if (maxBatches <= 0) continue;
-
-        // 检查所有输入是否都有足够库存
-        let batches = maxBatches;
-        for (const inp of r.inputs) {
-          if (inp.item === item) continue;
-          const have = available.get(inp.item) ?? 0;
-          batches = Math.min(batches, Math.floor(have / inp.coeff));
-        }
-        if (batches <= 0) continue;
-
-        // 执行配方
-        for (const inp of r.inputs) {
-          consume(available, inp.item, inp.coeff * batches);
-        }
-        for (const out of r.outputs) {
-          const produced = out.coeff * batches;
-          if (rawMaterialSet.has(out.item)) {
-            const prev = rawMaterials.get(out.item) ?? 0;
-            const deduct = Math.min(prev, produced);
-            if (deduct >= prev) rawMaterials.delete(out.item);
-            else rawMaterials.set(out.item, prev - deduct);
-            const surplus = produced - deduct;
-            if (surplus > 0) available.set(out.item, (available.get(out.item) ?? 0) + surplus);
-          } else {
-            available.set(out.item, (available.get(out.item) ?? 0) + produced);
-          }
-        }
-        steps.set(r.raw, (steps.get(r.raw) ?? 0) + batches);
-        changed = true;
-        break;
-      }
-    }
-  }
-}

@@ -2,3 +2,5 @@ node_modules/
 bun.lock
 dist/
 *.log
+scripts/items.json
+scripts/recipes.ts
